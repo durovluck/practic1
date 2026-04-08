@@ -128,13 +128,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="practic1.cpp" />
+    <ClCompile Include="RatingStorage.cpp" />
+    <ClCompile Include="StorageCommon.cpp" />
+    <ClCompile Include="TrackStorage.cpp" />
+    <ClCompile Include="UserStorage.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DomainEnums.h" />
     <ClInclude Include="Rating.h" />
+    <ClInclude Include="RatingStorage.h" />
+    <ClInclude Include="StorageCommon.h" />
     <ClInclude Include="Track.h" />
+    <ClInclude Include="TrackStorage.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="User.h" />
+    <ClInclude Include="UserStorage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
