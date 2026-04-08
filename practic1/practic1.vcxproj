@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="PasswordCrypto.cpp" />
     <ClCompile Include="practic1.cpp" />
     <ClCompile Include="RatingStorage.cpp" />
     <ClCompile Include="StorageCommon.cpp" />
@@ -135,6 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DomainEnums.h" />
+    <ClInclude Include="PasswordCrypto.h" />
     <ClInclude Include="Rating.h" />
     <ClInclude Include="RatingStorage.h" />
     <ClInclude Include="StorageCommon.h" />

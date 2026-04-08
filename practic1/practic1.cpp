@@ -31,10 +31,11 @@ namespace
         {
             const practic1::User& u = users[i];
             std::printf(
-                "  id=%d username=%s email=%s rank=%u blocked=%u verified=%u created_at=%lld\n",
+                "  id=%d username=%s email=%s password_hash=%s rank=%u blocked=%u verified=%u created_at=%lld\n",
                 static_cast<int>(u.id),
                 u.username,
                 u.email,
+                u.password,
                 static_cast<unsigned>(u.rank),
                 static_cast<unsigned>(u.is_blocked),
                 static_cast<unsigned>(u.is_verified),
@@ -99,7 +100,7 @@ namespace
     {
         practic1::User u1{};
         strcpy_s(u1.username, sizeof(u1.username), "alice");
-        strcpy_s(u1.email, sizeof(u1.email), "alice@test.com");
+        strcpy_s(u1.email, sizeof(u1.email), "any@test.com");
         strcpy_s(u1.password, sizeof(u1.password), "pass1");
         u1.rank = practic1::UserRank::User;
         u1.created_at = 1710000000;
@@ -255,24 +256,46 @@ int main()
     PrintTracks(tracks);
     PrintRatings(ratings);
 
+    std::printf("\n=== PASSWORD CHECK ===\n");
+    std::printf("For demo: alice password is pass1, admin password is adminpass.\n");
+    std::printf("Enter user id: ");
+
+    int input_id = 0;
+    if (scanf_s("%d", &input_id) != 1)
+    {
+        std::printf("Input error (user id)\n");
+        return 10;
+    }
+
+    char input_password[practic1::kPasswordLength]{};
+    std::printf("Enter password: ");
+    if (scanf_s("%63s", input_password, static_cast<unsigned>(sizeof(input_password))) != 1)
+    {
+        std::printf("Input error (password)\n");
+        return 11;
+    }
+
+    const bool auth_ok = users.VerifyCredentials(static_cast<practic1::Id>(input_id), input_password);
+    std::printf("Auth result: %s\n", auth_ok ? "SUCCESS" : "FAILED");
+
     practic1::User to_update{};
     if (!users.FindById(user_id_1, to_update))
     {
         std::printf("Find user error\n");
-        return 10;
+        return 12;
     }
 
     to_update.is_blocked = 1;
     if (!users.UpdateById(user_id_1, to_update))
     {
         std::printf("Update user error\n");
-        return 11;
+        return 13;
     }
 
     if (!ratings.DeleteById(rating_rows[2].id))
     {
         std::printf("Delete rating error\n");
-        return 12;
+        return 14;
     }
 
     std::printf("\n=== DATABASE SNAPSHOT (AFTER UPDATE + DELETE) ===\n");

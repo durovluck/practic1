@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="PasswordCrypto.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="practic1.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -33,6 +36,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DomainEnums.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PasswordCrypto.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rating.h">

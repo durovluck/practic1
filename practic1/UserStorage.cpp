@@ -1,10 +1,12 @@
 #include "UserStorage.h"
 
+#include "PasswordCrypto.h"
 #include "StorageCommon.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 
 namespace
@@ -80,6 +82,29 @@ namespace
 
         return false;
     }
+
+    bool NormalizePasswordField(char* password, std::size_t password_size)
+    {
+        if (password == nullptr || password_size == 0)
+        {
+            return false;
+        }
+
+        if (practic1::security::IsPasswordHashed(password))
+        {
+            return true;
+        }
+
+        char hashed[practic1::kPasswordLength]{};
+        if (!practic1::security::HashPassword(password, hashed, sizeof(hashed)))
+        {
+            return false;
+        }
+
+        std::memset(password, 0, password_size);
+        std::memcpy(password, hashed, std::strlen(hashed) + 1);
+        return true;
+    }
 }
 
 namespace practic1
@@ -96,6 +121,11 @@ namespace practic1
     {
         User record = user;
         if (!GenerateUniqueUserId(file_path_, record.id))
+        {
+            return false;
+        }
+
+        if (!NormalizePasswordField(record.password, sizeof(record.password)))
         {
             return false;
         }
@@ -166,6 +196,29 @@ namespace practic1
         return false;
     }
 
+    bool UserStorage::VerifyCredentials(Id id, const char* plain_password) const
+    {
+        FILE* file = storage_common::OpenFile(file_path_, "rb");
+        if (file == nullptr)
+        {
+            return false;
+        }
+
+        User current{};
+        while (std::fread(&current, sizeof(User), 1, file) == 1)
+        {
+            if (current.id == id)
+            {
+                const bool verified = security::VerifyPassword(plain_password, current.password);
+                std::fclose(file);
+                return verified;
+            }
+        }
+
+        std::fclose(file);
+        return false;
+    }
+
     bool UserStorage::UpdateById(Id id, const User& updated_user) const
     {
         FILE* source = storage_common::OpenFile(file_path_, "rb");
@@ -191,13 +244,21 @@ namespace practic1
         bool found = false;
         bool write_ok = true;
         User current{};
+        User normalized_update = updated_user;
+        if (!NormalizePasswordField(normalized_update.password, sizeof(normalized_update.password)))
+        {
+            std::fclose(source);
+            std::fclose(temp);
+            std::remove(temp_path);
+            return false;
+        }
 
         while (std::fread(&current, sizeof(User), 1, source) == 1)
         {
             const User* to_write = &current;
             if (current.id == id)
             {
-                to_write = &updated_user;
+                to_write = &normalized_update;
                 found = true;
             }
 
