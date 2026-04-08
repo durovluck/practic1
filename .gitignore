@@ -1,0 +1,34 @@
+# Visual Studio cache/options
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# Build folders
+Debug/
+Release/
+x64/
+x86/
+**/Debug/
+**/Release/
+**/x64/
+**/x86/
+
+# MSBuild and intermediate files
+*.obj
+*.idb
+*.pdb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.log
+*.ipch
+*.pch
+
+# Test and coverage artifacts
+TestResults/
+*.coverage
+*.coveragexml
