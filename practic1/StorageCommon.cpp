@@ -5,6 +5,22 @@
 
 namespace practic1::storage_common
 {
+    FILE* OpenFile(const char* path, const char* mode)
+    {
+        if (path == nullptr || mode == nullptr)
+        {
+            return nullptr;
+        }
+
+        FILE* file = nullptr;
+        if (fopen_s(&file, path, mode) != 0)
+        {
+            return nullptr;
+        }
+
+        return file;
+    }
+
     bool CopyPath(const char* source, char* destination, std::size_t destination_size)
     {
         if (source == nullptr || destination == nullptr || destination_size == 0)

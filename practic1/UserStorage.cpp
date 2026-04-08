@@ -2,7 +2,85 @@
 
 #include "StorageCommon.h"
 
+#include <cstdint>
+#include <cstdlib>
 #include <cstdio>
+#include <ctime>
+
+namespace
+{
+    constexpr practic1::Id kUserIdPrefix = 1;
+    constexpr practic1::Id kIdBase = 100000000;
+    constexpr practic1::Id kRandomAttempts = 256;
+
+    void EnsureRandomSeed()
+    {
+        static bool seeded = false;
+        if (!seeded)
+        {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            seeded = true;
+        }
+    }
+
+    std::uint32_t RandomSuffix8()
+    {
+        const std::uint32_t r1 = static_cast<std::uint32_t>(std::rand());
+        const std::uint32_t r2 = static_cast<std::uint32_t>(std::rand());
+        const std::uint32_t mixed = (r1 << 16) ^ r2;
+        return mixed % static_cast<std::uint32_t>(kIdBase);
+    }
+
+    bool UserIdExistsInFile(const char* file_path, practic1::Id id)
+    {
+        FILE* file = practic1::storage_common::OpenFile(file_path, "rb");
+        if (file == nullptr)
+        {
+            return false;
+        }
+
+        practic1::User current{};
+        while (std::fread(&current, sizeof(practic1::User), 1, file) == 1)
+        {
+            if (current.id == id)
+            {
+                std::fclose(file);
+                return true;
+            }
+        }
+
+        std::fclose(file);
+        return false;
+    }
+
+    bool GenerateUniqueUserId(const char* file_path, practic1::Id& out_id)
+    {
+        EnsureRandomSeed();
+        const practic1::Id prefix_value = kUserIdPrefix * kIdBase;
+
+        for (practic1::Id i = 0; i < kRandomAttempts; ++i)
+        {
+            const practic1::Id candidate = prefix_value + static_cast<practic1::Id>(RandomSuffix8());
+            if (!UserIdExistsInFile(file_path, candidate))
+            {
+                out_id = candidate;
+                return true;
+            }
+        }
+
+        for (practic1::Id suffix = 0; suffix < kIdBase; ++suffix)
+        {
+            const practic1::Id candidate = prefix_value + suffix;
+            if (!UserIdExistsInFile(file_path, candidate))
+            {
+                out_id = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
 
 namespace practic1
 {
@@ -16,13 +94,19 @@ namespace practic1
 
     bool UserStorage::Add(const User& user) const
     {
-        FILE* file = std::fopen(file_path_, "ab");
+        User record = user;
+        if (!GenerateUniqueUserId(file_path_, record.id))
+        {
+            return false;
+        }
+
+        FILE* file = storage_common::OpenFile(file_path_, "ab");
         if (file == nullptr)
         {
             return false;
         }
 
-        const bool write_ok = std::fwrite(&user, sizeof(User), 1, file) == 1;
+        const bool write_ok = std::fwrite(&record, sizeof(User), 1, file) == 1;
         std::fclose(file);
         return write_ok;
     }
@@ -35,7 +119,7 @@ namespace practic1
             return false;
         }
 
-        FILE* file = std::fopen(file_path_, "rb");
+        FILE* file = storage_common::OpenFile(file_path_, "rb");
         if (file == nullptr)
         {
             return true;
@@ -61,7 +145,7 @@ namespace practic1
 
     bool UserStorage::FindById(Id id, User& out_user) const
     {
-        FILE* file = std::fopen(file_path_, "rb");
+        FILE* file = storage_common::OpenFile(file_path_, "rb");
         if (file == nullptr)
         {
             return false;
@@ -84,7 +168,7 @@ namespace practic1
 
     bool UserStorage::UpdateById(Id id, const User& updated_user) const
     {
-        FILE* source = std::fopen(file_path_, "rb");
+        FILE* source = storage_common::OpenFile(file_path_, "rb");
         if (source == nullptr)
         {
             return false;
@@ -97,7 +181,7 @@ namespace practic1
             return false;
         }
 
-        FILE* temp = std::fopen(temp_path, "wb");
+        FILE* temp = storage_common::OpenFile(temp_path, "wb");
         if (temp == nullptr)
         {
             std::fclose(source);
@@ -145,7 +229,7 @@ namespace practic1
 
     bool UserStorage::DeleteById(Id id) const
     {
-        FILE* source = std::fopen(file_path_, "rb");
+        FILE* source = storage_common::OpenFile(file_path_, "rb");
         if (source == nullptr)
         {
             return false;
@@ -158,7 +242,7 @@ namespace practic1
             return false;
         }
 
-        FILE* temp = std::fopen(temp_path, "wb");
+        FILE* temp = storage_common::OpenFile(temp_path, "wb");
         if (temp == nullptr)
         {
             std::fclose(source);
