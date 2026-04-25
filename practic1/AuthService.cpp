@@ -8,7 +8,7 @@
 
 namespace
 {
-    constexpr std::size_t kMaxUsersInService = 4096;
+    constexpr std::size_t kMaxUsersInService = 1024;
 
     bool IsNullOrEmpty(const char* text)
     {
@@ -80,6 +80,11 @@ namespace practic1
         for (std::size_t i = 0; i < user_count; ++i)
         {
             if (std::strcmp(users[i].email, email) == 0)
+            {
+                return false;
+            }
+
+            if (std::strcmp(users[i].username, username) == 0)
             {
                 return false;
             }

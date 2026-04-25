@@ -9,7 +9,7 @@
 
 namespace
 {
-    constexpr std::size_t kMaxTracksInService = 4096;
+    constexpr std::size_t kMaxTracksInService = 512;
 
     bool IsNullOrEmpty(const char* text)
     {

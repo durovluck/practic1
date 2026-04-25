@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AdminService.cpp" />
     <ClCompile Include="AuthService.cpp" />
     <ClCompile Include="PasswordCrypto.cpp" />
     <ClCompile Include="practic1.cpp" />
@@ -138,6 +139,7 @@
     <ClCompile Include="UserStorage.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AdminService.h" />
     <ClInclude Include="AuthService.h" />
     <ClInclude Include="DomainEnums.h" />
     <ClInclude Include="PasswordCrypto.h" />

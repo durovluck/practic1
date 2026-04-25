@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AdminService.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="AuthService.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -44,6 +47,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AdminService.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="AuthService.h">
       <Filter>Header Files</Filter>
     </ClInclude>

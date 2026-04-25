@@ -6,7 +6,7 @@
 
 namespace
 {
-    constexpr std::size_t kMaxRatingsInService = 8192;
+    constexpr std::size_t kMaxRatingsInService = 4096;
 }
 
 namespace practic1
