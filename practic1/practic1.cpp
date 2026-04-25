@@ -2,10 +2,14 @@
 #include "UserStorage.h"
 
 #include <cstdio>
+#include <cstring>
 #include <ctime>
+#include <windows.h>
 
 namespace
 {
+    constexpr std::size_t kMaxUsersInDbConsole = 4096;
+
     void PrintUserAccount(const practic1::User& user)
     {
         std::printf("\n=== ACCOUNT DATA ===\n");
@@ -18,6 +22,140 @@ namespace
         std::printf("created_at (unix): %lld\n", static_cast<long long>(user.created_at));
     }
 
+    bool IsDbConsoleMode(int argc, char* argv[])
+    {
+        return argc > 1 && argv != nullptr && std::strcmp(argv[1], "--db-console") == 0;
+    }
+
+    void PrintUsersDatabase()
+    {
+        practic1::UserStorage user_storage("users_app.dat");
+        practic1::User users[kMaxUsersInDbConsole]{};
+        std::size_t count = 0;
+
+        if (!user_storage.ReadAll(users, kMaxUsersInDbConsole, count))
+        {
+            std::printf("Read error.\n");
+            return;
+        }
+
+        std::printf("\n=== USERS DATABASE (users_app.dat) ===\n");
+        std::printf("rows: %zu\n", count);
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const practic1::User& u = users[i];
+            std::printf(
+                "id=%d username=%s email=%s password_hash=%s rank=%u blocked=%u verified=%u created_at=%lld\n",
+                static_cast<int>(u.id),
+                u.username,
+                u.email,
+                u.password,
+                static_cast<unsigned>(u.rank),
+                static_cast<unsigned>(u.is_blocked),
+                static_cast<unsigned>(u.is_verified),
+                static_cast<long long>(u.created_at));
+        }
+    }
+
+    bool ClearUsersDatabase()
+    {
+        FILE* file = nullptr;
+        if (fopen_s(&file, "users_app.dat", "rb") != 0 || file == nullptr)
+        {
+            return true;
+        }
+
+        std::fclose(file);
+        return std::remove("users_app.dat") == 0;
+    }
+
+    int RunDatabaseConsole()
+    {
+        std::printf("=== DB CONSOLE ===\n");
+        std::printf("Commands:\n");
+        std::printf("1 - show database\n");
+        std::printf("2 - clear database\n");
+        std::printf("3 - exit db console\n");
+
+        for (;;)
+        {
+            std::printf("\nDB command: ");
+            int command = 0;
+            if (scanf_s("%d", &command) != 1)
+            {
+                std::printf("Input error.\n");
+                return 1;
+            }
+
+            if (command == 1)
+            {
+                PrintUsersDatabase();
+                continue;
+            }
+
+            if (command == 2)
+            {
+                if (ClearUsersDatabase())
+                {
+                    std::printf("Database cleared.\n");
+                }
+                else
+                {
+                    std::printf("Clear failed.\n");
+                }
+                continue;
+            }
+
+            if (command == 3)
+            {
+                return 0;
+            }
+
+            std::printf("Unknown command.\n");
+        }
+    }
+
+    bool StartDatabaseConsoleProcess()
+    {
+        char exe_path[MAX_PATH]{};
+        const DWORD path_len = GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+        if (path_len == 0 || path_len >= MAX_PATH)
+        {
+            return false;
+        }
+
+        char command_line[MAX_PATH + 64]{};
+        if (sprintf_s(command_line, "\"%s\" --db-console", exe_path) <= 0)
+        {
+            return false;
+        }
+
+        STARTUPINFOA startup_info{};
+        startup_info.cb = sizeof(startup_info);
+
+        PROCESS_INFORMATION process_info{};
+        const BOOL created = CreateProcessA(
+            nullptr,
+            command_line,
+            nullptr,
+            nullptr,
+            FALSE,
+            CREATE_NEW_CONSOLE,
+            nullptr,
+            nullptr,
+            &startup_info,
+            &process_info);
+
+        if (!created)
+        {
+            return false;
+        }
+
+        CloseHandle(process_info.hThread);
+        CloseHandle(process_info.hProcess);
+        return true;
+    }
+
     bool ReadTextInput(const char* prompt, char* buffer, unsigned buffer_size)
     {
         if (prompt == nullptr || buffer == nullptr || buffer_size == 0)
@@ -25,8 +163,14 @@ namespace
             return false;
         }
 
+        char scan_format[16]{};
+        if (std::snprintf(scan_format, sizeof(scan_format), "%%%us", buffer_size - 1) <= 0)
+        {
+            return false;
+        }
+
         std::printf("%s", prompt);
-        if (scanf_s("%63s", buffer, buffer_size) != 1)
+        if (scanf_s(scan_format, buffer, buffer_size) != 1)
         {
             return false;
         }
@@ -34,8 +178,18 @@ namespace
     }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (IsDbConsoleMode(argc, argv))
+    {
+        return RunDatabaseConsole();
+    }
+
+    if (!StartDatabaseConsoleProcess())
+    {
+        std::printf("Warning: cannot start second DB console.\n");
+    }
+
     practic1::UserStorage user_storage("users_app.dat");
     practic1::AuthService auth_service(user_storage);
 
