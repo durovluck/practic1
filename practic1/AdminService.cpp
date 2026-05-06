@@ -49,6 +49,52 @@ namespace practic1
         return user_storage_.ReadAll(out_users, capacity, out_count);
     }
 
+    bool AdminService::CreateUser(Id admin_id, const User& new_user) const
+    {
+        if (!IsAdmin(admin_id))
+        {
+            return false;
+        }
+
+        if (new_user.username[0] == '\0' ||
+            new_user.email[0] == '\0' ||
+            new_user.password[0] == '\0')
+        {
+            return false;
+        }
+
+        if (new_user.rank != UserRank::User && new_user.rank != UserRank::Admin)
+        {
+            return false;
+        }
+
+        if ((new_user.is_blocked != 0 && new_user.is_blocked != 1) ||
+            (new_user.is_verified != 0 && new_user.is_verified != 1))
+        {
+            return false;
+        }
+
+        User users[kMaxUsersInAdminService]{};
+        std::size_t user_count = 0;
+        if (!user_storage_.ReadAll(users, kMaxUsersInAdminService, user_count))
+        {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < user_count; ++i)
+        {
+            if (std::strcmp(users[i].email, new_user.email) == 0 ||
+                std::strcmp(users[i].username, new_user.username) == 0)
+            {
+                return false;
+            }
+        }
+
+        User record = new_user;
+        record.id = 0;
+        return user_storage_.Add(record);
+    }
+
     bool AdminService::SetUserBlocked(Id admin_id, Id target_user_id, std::uint8_t is_blocked) const
     {
         if (!IsAdmin(admin_id) || target_user_id <= 0 || (is_blocked != 0 && is_blocked != 1))
@@ -123,6 +169,16 @@ namespace practic1
         return user_storage_.UpdateById(target_user_id, record);
     }
 
+    bool AdminService::DeleteUser(Id admin_id, Id target_user_id) const
+    {
+        if (!IsAdmin(admin_id) || target_user_id <= 0 || target_user_id == admin_id)
+        {
+            return false;
+        }
+
+        return user_storage_.DeleteById(target_user_id);
+    }
+
     bool AdminService::GetAllTracks(Id admin_id, Track* out_tracks, std::size_t capacity, std::size_t& out_count) const
     {
         if (!IsAdmin(admin_id))
@@ -131,6 +187,43 @@ namespace practic1
         }
 
         return track_storage_.ReadAll(out_tracks, capacity, out_count);
+    }
+
+    bool AdminService::CreateTrack(Id admin_id, const Track& new_track) const
+    {
+        if (!IsAdmin(admin_id))
+        {
+            return false;
+        }
+
+        if (new_track.title[0] == '\0' ||
+            new_track.file_path[0] == '\0' ||
+            new_track.duration == 0 ||
+            new_track.bpm == 0 ||
+            new_track.author_id <= 0)
+        {
+            return false;
+        }
+
+        if (new_track.average_rating < 0.0f || new_track.average_rating > 5.0f)
+        {
+            return false;
+        }
+
+        if (new_track.status != TrackStatus::Active && new_track.status != TrackStatus::Blocked)
+        {
+            return false;
+        }
+
+        User author{};
+        if (!user_storage_.FindById(new_track.author_id, author))
+        {
+            return false;
+        }
+
+        Track record = new_track;
+        record.id = 0;
+        return track_storage_.Add(record);
     }
 
     bool AdminService::SetTrackStatus(Id admin_id, Id track_id, TrackStatus status) const
@@ -193,6 +286,16 @@ namespace practic1
         return track_storage_.UpdateById(track_id, record);
     }
 
+    bool AdminService::DeleteTrack(Id admin_id, Id track_id) const
+    {
+        if (!IsAdmin(admin_id) || track_id <= 0)
+        {
+            return false;
+        }
+
+        return track_storage_.DeleteById(track_id);
+    }
+
     bool AdminService::GetAllRatings(Id admin_id, Rating* out_ratings, std::size_t capacity, std::size_t& out_count) const
     {
         if (!IsAdmin(admin_id))
@@ -201,6 +304,42 @@ namespace practic1
         }
 
         return rating_storage_.ReadAll(out_ratings, capacity, out_count);
+    }
+
+    bool AdminService::CreateRating(Id admin_id, const Rating& new_rating) const
+    {
+        if (!IsAdmin(admin_id))
+        {
+            return false;
+        }
+
+        if (new_rating.track_id <= 0 ||
+            new_rating.user_id <= 0 ||
+            new_rating.value > 5)
+        {
+            return false;
+        }
+
+        Track track{};
+        if (!track_storage_.FindById(new_rating.track_id, track))
+        {
+            return false;
+        }
+
+        User user{};
+        if (!user_storage_.FindById(new_rating.user_id, user))
+        {
+            return false;
+        }
+
+        Rating record = new_rating;
+        record.id = 0;
+        if (!rating_storage_.Add(record))
+        {
+            return false;
+        }
+
+        return RecalculateTrackStats(new_rating.track_id);
     }
 
     bool AdminService::UpdateRating(Id admin_id, Id rating_id, const Rating& updated_rating) const
@@ -253,6 +392,27 @@ namespace practic1
         }
 
         return true;
+    }
+
+    bool AdminService::DeleteRating(Id admin_id, Id rating_id) const
+    {
+        if (!IsAdmin(admin_id) || rating_id <= 0)
+        {
+            return false;
+        }
+
+        Rating existing{};
+        if (!rating_storage_.FindById(rating_id, existing))
+        {
+            return false;
+        }
+
+        if (!rating_storage_.DeleteById(rating_id))
+        {
+            return false;
+        }
+
+        return RecalculateTrackStats(existing.track_id);
     }
 
     bool AdminService::GetPlatformStats(Id admin_id, PlatformStats& out_stats) const

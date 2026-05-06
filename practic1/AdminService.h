@@ -34,15 +34,21 @@ namespace practic1
         bool IsAdmin(Id user_id) const;
 
         bool GetAllUsers(Id admin_id, User* out_users, std::size_t capacity, std::size_t& out_count) const;
+        bool CreateUser(Id admin_id, const User& new_user) const;
         bool SetUserBlocked(Id admin_id, Id target_user_id, std::uint8_t is_blocked) const;
         bool UpdateUser(Id admin_id, Id target_user_id, const User& updated_user) const;
+        bool DeleteUser(Id admin_id, Id target_user_id) const;
 
         bool GetAllTracks(Id admin_id, Track* out_tracks, std::size_t capacity, std::size_t& out_count) const;
+        bool CreateTrack(Id admin_id, const Track& new_track) const;
         bool SetTrackStatus(Id admin_id, Id track_id, TrackStatus status) const;
         bool UpdateTrack(Id admin_id, Id track_id, const Track& updated_track) const;
+        bool DeleteTrack(Id admin_id, Id track_id) const;
 
         bool GetAllRatings(Id admin_id, Rating* out_ratings, std::size_t capacity, std::size_t& out_count) const;
+        bool CreateRating(Id admin_id, const Rating& new_rating) const;
         bool UpdateRating(Id admin_id, Id rating_id, const Rating& updated_rating) const;
+        bool DeleteRating(Id admin_id, Id rating_id) const;
 
         bool GetPlatformStats(Id admin_id, PlatformStats& out_stats) const;
 
