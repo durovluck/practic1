@@ -1,6 +1,8 @@
 #include "AdminService.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 
 namespace
 {
@@ -64,6 +66,63 @@ namespace practic1
         return user_storage_.UpdateById(target_user_id, target);
     }
 
+    bool AdminService::UpdateUser(Id admin_id, Id target_user_id, const User& updated_user) const
+    {
+        if (!IsAdmin(admin_id) || target_user_id <= 0)
+        {
+            return false;
+        }
+
+        if (updated_user.username[0] == '\0' ||
+            updated_user.email[0] == '\0' ||
+            updated_user.password[0] == '\0')
+        {
+            return false;
+        }
+
+        if (updated_user.rank != UserRank::User && updated_user.rank != UserRank::Admin)
+        {
+            return false;
+        }
+
+        if ((updated_user.is_blocked != 0 && updated_user.is_blocked != 1) ||
+            (updated_user.is_verified != 0 && updated_user.is_verified != 1))
+        {
+            return false;
+        }
+
+        User existing{};
+        if (!user_storage_.FindById(target_user_id, existing))
+        {
+            return false;
+        }
+
+        User users[kMaxUsersInAdminService]{};
+        std::size_t user_count = 0;
+        if (!user_storage_.ReadAll(users, kMaxUsersInAdminService, user_count))
+        {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < user_count; ++i)
+        {
+            if (users[i].id == target_user_id)
+            {
+                continue;
+            }
+
+            if (std::strcmp(users[i].email, updated_user.email) == 0 ||
+                std::strcmp(users[i].username, updated_user.username) == 0)
+            {
+                return false;
+            }
+        }
+
+        User record = updated_user;
+        record.id = target_user_id;
+        return user_storage_.UpdateById(target_user_id, record);
+    }
+
     bool AdminService::GetAllTracks(Id admin_id, Track* out_tracks, std::size_t capacity, std::size_t& out_count) const
     {
         if (!IsAdmin(admin_id))
@@ -89,6 +148,111 @@ namespace practic1
 
         track.status = status;
         return track_storage_.UpdateById(track_id, track);
+    }
+
+    bool AdminService::UpdateTrack(Id admin_id, Id track_id, const Track& updated_track) const
+    {
+        if (!IsAdmin(admin_id) || track_id <= 0)
+        {
+            return false;
+        }
+
+        if (updated_track.title[0] == '\0' ||
+            updated_track.file_path[0] == '\0' ||
+            updated_track.duration == 0 ||
+            updated_track.bpm == 0 ||
+            updated_track.author_id <= 0)
+        {
+            return false;
+        }
+
+        if (updated_track.average_rating < 0.0f || updated_track.average_rating > 5.0f)
+        {
+            return false;
+        }
+
+        if (updated_track.status != TrackStatus::Active && updated_track.status != TrackStatus::Blocked)
+        {
+            return false;
+        }
+
+        Track existing{};
+        if (!track_storage_.FindById(track_id, existing))
+        {
+            return false;
+        }
+
+        User author{};
+        if (!user_storage_.FindById(updated_track.author_id, author))
+        {
+            return false;
+        }
+
+        Track record = updated_track;
+        record.id = track_id;
+        return track_storage_.UpdateById(track_id, record);
+    }
+
+    bool AdminService::GetAllRatings(Id admin_id, Rating* out_ratings, std::size_t capacity, std::size_t& out_count) const
+    {
+        if (!IsAdmin(admin_id))
+        {
+            return false;
+        }
+
+        return rating_storage_.ReadAll(out_ratings, capacity, out_count);
+    }
+
+    bool AdminService::UpdateRating(Id admin_id, Id rating_id, const Rating& updated_rating) const
+    {
+        if (!IsAdmin(admin_id) || rating_id <= 0)
+        {
+            return false;
+        }
+
+        if (updated_rating.track_id <= 0 ||
+            updated_rating.user_id <= 0 ||
+            updated_rating.value > 5)
+        {
+            return false;
+        }
+
+        Rating existing{};
+        if (!rating_storage_.FindById(rating_id, existing))
+        {
+            return false;
+        }
+
+        Track track{};
+        if (!track_storage_.FindById(updated_rating.track_id, track))
+        {
+            return false;
+        }
+
+        User user{};
+        if (!user_storage_.FindById(updated_rating.user_id, user))
+        {
+            return false;
+        }
+
+        Rating record = updated_rating;
+        record.id = rating_id;
+        if (!rating_storage_.UpdateById(rating_id, record))
+        {
+            return false;
+        }
+
+        if (!RecalculateTrackStats(existing.track_id))
+        {
+            return false;
+        }
+
+        if (existing.track_id != record.track_id && !RecalculateTrackStats(record.track_id))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     bool AdminService::GetPlatformStats(Id admin_id, PlatformStats& out_stats) const
@@ -161,5 +325,39 @@ namespace practic1
             : static_cast<float>(sum) / static_cast<float>(rating_count);
 
         return true;
+    }
+
+    bool AdminService::RecalculateTrackStats(Id track_id) const
+    {
+        Track track{};
+        if (!track_storage_.FindById(track_id, track))
+        {
+            return false;
+        }
+
+        Rating ratings[kMaxRatingsInAdminService]{};
+        std::size_t rating_count = 0;
+        if (!rating_storage_.ReadAll(ratings, kMaxRatingsInAdminService, rating_count))
+        {
+            return false;
+        }
+
+        std::uint64_t sum = 0;
+        std::uint32_t count_for_track = 0;
+        for (std::size_t i = 0; i < rating_count; ++i)
+        {
+            if (ratings[i].track_id == track_id)
+            {
+                sum += ratings[i].value;
+                ++count_for_track;
+            }
+        }
+
+        track.ratings_count = count_for_track;
+        track.average_rating = count_for_track == 0
+            ? 0.0f
+            : static_cast<float>(sum) / static_cast<float>(count_for_track);
+
+        return track_storage_.UpdateById(track_id, track);
     }
 }

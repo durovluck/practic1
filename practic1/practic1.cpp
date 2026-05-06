@@ -20,9 +20,12 @@ namespace
     constexpr std::size_t kMaxTracksInUi = 1024;
     constexpr std::size_t kMaxUsersInAdminUi = 1024;
     constexpr std::size_t kMaxTracksInAdminUi = 2048;
+    constexpr std::size_t kMaxRatingsInAdminUi = 8192;
 
     bool ReadTextInput(const char* prompt, char* buffer, unsigned buffer_size);
     bool ReadIntInput(const char* prompt, int& out_value);
+    bool ReadLongLongInput(const char* prompt, long long& out_value);
+    bool ReadFloatInput(const char* prompt, float& out_value);
 
     void PrintUserAccount(const practic1::User& user)
     {
@@ -49,6 +52,16 @@ namespace
         std::printf("ratings_count: %u\n", static_cast<unsigned>(track.ratings_count));
         std::printf("status: %u\n", static_cast<unsigned>(track.status));
         std::printf("bpm: %u\n", static_cast<unsigned>(track.bpm));
+    }
+
+    void PrintRating(const practic1::Rating& rating)
+    {
+        std::printf("\n=== RATING ===\n");
+        std::printf("id: %d\n", static_cast<int>(rating.id));
+        std::printf("track_id: %d\n", static_cast<int>(rating.track_id));
+        std::printf("user_id: %d\n", static_cast<int>(rating.user_id));
+        std::printf("value: %u\n", static_cast<unsigned>(rating.value));
+        std::printf("created_at (unix): %lld\n", static_cast<long long>(rating.created_at));
     }
 
     void PrintMainMenu(bool is_logged_in, const practic1::User& current_user, bool has_current_track)
@@ -280,6 +293,56 @@ namespace
         return true;
     }
 
+    bool ReadLongLongInput(const char* prompt, long long& out_value)
+    {
+        if (prompt == nullptr)
+        {
+            return false;
+        }
+
+        char input[64]{};
+        if (!ReadTextInput(prompt, input, static_cast<unsigned>(sizeof(input))))
+        {
+            return false;
+        }
+
+        errno = 0;
+        char* end_ptr = nullptr;
+        const long long parsed = std::strtoll(input, &end_ptr, 10);
+        if (errno != 0 || end_ptr == input || *end_ptr != '\0')
+        {
+            return false;
+        }
+
+        out_value = parsed;
+        return true;
+    }
+
+    bool ReadFloatInput(const char* prompt, float& out_value)
+    {
+        if (prompt == nullptr)
+        {
+            return false;
+        }
+
+        char input[64]{};
+        if (!ReadTextInput(prompt, input, static_cast<unsigned>(sizeof(input))))
+        {
+            return false;
+        }
+
+        errno = 0;
+        char* end_ptr = nullptr;
+        const float parsed = std::strtof(input, &end_ptr);
+        if (errno != 0 || end_ptr == input || *end_ptr != '\0')
+        {
+            return false;
+        }
+
+        out_value = parsed;
+        return true;
+    }
+
     bool EnsureDefaultAdmin(practic1::UserStorage& user_storage)
     {
         static constexpr char kDefaultAdminUsername[] = "admin";
@@ -323,6 +386,10 @@ namespace
         std::printf("3 - List tracks\n");
         std::printf("4 - Change track status\n");
         std::printf("5 - Platform stats\n");
+        std::printf("6 - List ratings\n");
+        std::printf("7 - Full edit user\n");
+        std::printf("8 - Full edit track\n");
+        std::printf("9 - Full edit rating\n");
         std::printf("0 - Back\n");
         std::printf("-----------------------------------\n");
     }
@@ -358,13 +425,15 @@ namespace
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     std::printf(
-                        "id=%d username=%s email=%s rank=%u blocked=%u verified=%u\n",
+                        "id=%d username=%s email=%s password_hash=%s rank=%u blocked=%u verified=%u created_at=%lld\n",
                         static_cast<int>(users[i].id),
                         users[i].username,
                         users[i].email,
+                        users[i].password,
                         static_cast<unsigned>(users[i].rank),
                         static_cast<unsigned>(users[i].is_blocked),
-                        static_cast<unsigned>(users[i].is_verified));
+                        static_cast<unsigned>(users[i].is_verified),
+                        static_cast<long long>(users[i].created_at));
                 }
                 continue;
             }
@@ -413,13 +482,18 @@ namespace
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     std::printf(
-                        "id=%d title=%s author=%d status=%u avg=%.2f ratings=%u\n",
+                        "id=%d title=%s file_path=%s genre=%u duration=%u upload_date=%lld author=%d avg=%.2f ratings=%u status=%u bpm=%u\n",
                         static_cast<int>(tracks[i].id),
                         tracks[i].title,
+                        tracks[i].file_path,
+                        static_cast<unsigned>(tracks[i].genre),
+                        static_cast<unsigned>(tracks[i].duration),
+                        static_cast<long long>(tracks[i].upload_date),
                         static_cast<int>(tracks[i].author_id),
-                        static_cast<unsigned>(tracks[i].status),
                         tracks[i].average_rating,
-                        static_cast<unsigned>(tracks[i].ratings_count));
+                        static_cast<unsigned>(tracks[i].ratings_count),
+                        static_cast<unsigned>(tracks[i].status),
+                        static_cast<unsigned>(tracks[i].bpm));
                 }
                 continue;
             }
@@ -473,6 +547,180 @@ namespace
                 std::printf("blocked_tracks_total: %u\n", static_cast<unsigned>(stats.blocked_tracks_total));
                 std::printf("ratings_total: %u\n", static_cast<unsigned>(stats.ratings_total));
                 std::printf("average_rating_overall: %.2f\n", stats.average_rating_overall);
+                continue;
+            }
+
+            if (command == 6)
+            {
+                static practic1::Rating ratings[kMaxRatingsInAdminUi]{};
+                std::size_t count = 0;
+                if (!admin_service.GetAllRatings(current_user.id, ratings, kMaxRatingsInAdminUi, count))
+                {
+                    std::printf("Cannot read ratings.\n");
+                    continue;
+                }
+
+                std::printf("\n=== RATINGS (%zu) ===\n", count);
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    std::printf(
+                        "id=%d track_id=%d user_id=%d value=%u created_at=%lld\n",
+                        static_cast<int>(ratings[i].id),
+                        static_cast<int>(ratings[i].track_id),
+                        static_cast<int>(ratings[i].user_id),
+                        static_cast<unsigned>(ratings[i].value),
+                        static_cast<long long>(ratings[i].created_at));
+                }
+                continue;
+            }
+
+            if (command == 7)
+            {
+                int target_id = 0;
+                int rank_code = 0;
+                int blocked_flag = 0;
+                int verified_flag = 0;
+                long long created_at = 0;
+                practic1::User updated_user{};
+
+                if (!ReadIntInput("Target user id: ", target_id) ||
+                    !ReadTextInput("New username: ", updated_user.username, static_cast<unsigned>(sizeof(updated_user.username))) ||
+                    !ReadTextInput("New email: ", updated_user.email, static_cast<unsigned>(sizeof(updated_user.email))) ||
+                    !ReadTextInput("New password or existing hash: ", updated_user.password, static_cast<unsigned>(sizeof(updated_user.password))) ||
+                    !ReadIntInput("Rank (1=User, 2=Admin): ", rank_code) ||
+                    !ReadIntInput("Blocked flag (0/1): ", blocked_flag) ||
+                    !ReadIntInput("Verified flag (0/1): ", verified_flag) ||
+                    !ReadLongLongInput("Created_at unix: ", created_at))
+                {
+                    std::printf("Input error.\n");
+                    continue;
+                }
+
+                if (target_id <= 0 ||
+                    (rank_code != 1 && rank_code != 2) ||
+                    (blocked_flag != 0 && blocked_flag != 1) ||
+                    (verified_flag != 0 && verified_flag != 1))
+                {
+                    std::printf("Invalid values.\n");
+                    continue;
+                }
+
+                updated_user.id = static_cast<practic1::Id>(target_id);
+                updated_user.rank = rank_code == 1 ? practic1::UserRank::User : practic1::UserRank::Admin;
+                updated_user.is_blocked = static_cast<std::uint8_t>(blocked_flag);
+                updated_user.is_verified = static_cast<std::uint8_t>(verified_flag);
+                updated_user.created_at = static_cast<practic1::Timestamp>(created_at);
+
+                if (!admin_service.UpdateUser(current_user.id, updated_user.id, updated_user))
+                {
+                    std::printf("Full user update failed.\n");
+                    continue;
+                }
+
+                std::printf("User fully updated.\n");
+                continue;
+            }
+
+            if (command == 8)
+            {
+                int track_id = 0;
+                int genre = 0;
+                int duration = 0;
+                int author_id = 0;
+                int ratings_count = 0;
+                int status_code = 0;
+                int bpm = 0;
+                long long upload_date = 0;
+                float average_rating = 0.0f;
+                practic1::Track updated_track{};
+
+                if (!ReadIntInput("Track id: ", track_id) ||
+                    !ReadTextInput("New title: ", updated_track.title, static_cast<unsigned>(sizeof(updated_track.title))) ||
+                    !ReadTextInput("New file_path: ", updated_track.file_path, static_cast<unsigned>(sizeof(updated_track.file_path))) ||
+                    !ReadIntInput("Genre code (0..65535): ", genre) ||
+                    !ReadIntInput("Duration seconds: ", duration) ||
+                    !ReadLongLongInput("Upload_date unix: ", upload_date) ||
+                    !ReadIntInput("Author user id: ", author_id) ||
+                    !ReadFloatInput("Average rating (0..5): ", average_rating) ||
+                    !ReadIntInput("Ratings count: ", ratings_count) ||
+                    !ReadIntInput("Status (1=Active, 2=Blocked): ", status_code) ||
+                    !ReadIntInput("BPM (1..65535): ", bpm))
+                {
+                    std::printf("Input error.\n");
+                    continue;
+                }
+
+                if (track_id <= 0 ||
+                    genre < 0 || genre > 65535 ||
+                    duration <= 0 ||
+                    author_id <= 0 ||
+                    average_rating < 0.0f || average_rating > 5.0f ||
+                    ratings_count < 0 ||
+                    (status_code != 1 && status_code != 2) ||
+                    bpm <= 0 || bpm > 65535)
+                {
+                    std::printf("Invalid values.\n");
+                    continue;
+                }
+
+                updated_track.id = static_cast<practic1::Id>(track_id);
+                updated_track.genre = static_cast<std::uint16_t>(genre);
+                updated_track.duration = static_cast<practic1::DurationSeconds>(duration);
+                updated_track.upload_date = static_cast<practic1::Timestamp>(upload_date);
+                updated_track.author_id = static_cast<practic1::Id>(author_id);
+                updated_track.average_rating = average_rating;
+                updated_track.ratings_count = static_cast<std::uint32_t>(ratings_count);
+                updated_track.status = status_code == 1 ? practic1::TrackStatus::Active : practic1::TrackStatus::Blocked;
+                updated_track.bpm = static_cast<std::uint16_t>(bpm);
+
+                if (!admin_service.UpdateTrack(current_user.id, updated_track.id, updated_track))
+                {
+                    std::printf("Full track update failed.\n");
+                    continue;
+                }
+
+                std::printf("Track fully updated.\n");
+                continue;
+            }
+
+            if (command == 9)
+            {
+                int rating_id = 0;
+                int track_id = 0;
+                int user_id = 0;
+                int value = 0;
+                long long created_at = 0;
+                practic1::Rating updated_rating{};
+
+                if (!ReadIntInput("Rating id: ", rating_id) ||
+                    !ReadIntInput("Track id: ", track_id) ||
+                    !ReadIntInput("User id: ", user_id) ||
+                    !ReadIntInput("Value (0..5): ", value) ||
+                    !ReadLongLongInput("Created_at unix: ", created_at))
+                {
+                    std::printf("Input error.\n");
+                    continue;
+                }
+
+                if (rating_id <= 0 || track_id <= 0 || user_id <= 0 || value < 0 || value > 5)
+                {
+                    std::printf("Invalid values.\n");
+                    continue;
+                }
+
+                updated_rating.id = static_cast<practic1::Id>(rating_id);
+                updated_rating.track_id = static_cast<practic1::Id>(track_id);
+                updated_rating.user_id = static_cast<practic1::Id>(user_id);
+                updated_rating.value = static_cast<practic1::RatingValue>(value);
+                updated_rating.created_at = static_cast<practic1::Timestamp>(created_at);
+
+                if (!admin_service.UpdateRating(current_user.id, updated_rating.id, updated_rating))
+                {
+                    std::printf("Full rating update failed.\n");
+                    continue;
+                }
+
+                std::printf("Rating fully updated. Track statistics recalculated.\n");
                 continue;
             }
 
